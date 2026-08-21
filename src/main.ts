@@ -72,6 +72,24 @@ async function bootstrap() {
     SwaggerModule.setup('api', app, document);
   }
 
+  const webPath = require('path').join(process.cwd(), 'web');
+  const fs = require('fs');
+  if (fs.existsSync(webPath)) {
+    const express = require('express');
+    const expressApp = app.getHttpAdapter().getInstance();
+    expressApp.use(express.static(webPath));
+    expressApp.get('*', (req: any, res: any, next: any) => {
+      if (
+        req.path.startsWith('/api') ||
+        req.path.startsWith('/health') ||
+        req.path.startsWith('/uploads')
+      ) {
+        return next();
+      }
+      res.sendFile(require('path').join(webPath, 'index.html'));
+    });
+  }
+
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
   await app.listen(port, '0.0.0.0');
 
