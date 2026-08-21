@@ -38,8 +38,18 @@ export class AdminService {
     if (status) updateData.status = status;
     if (plan) updateData.plan = plan;
     if (durationDays && durationDays > 0) {
+      const current = await this.prisma.subscription.findUnique({
+        where: { id: subscriptionId },
+        select: { currentPeriodEnd: true },
+      });
       const now = new Date();
-      updateData.currentPeriodEnd = new Date(now.getTime() + durationDays * 86400000);
+      const baseDate =
+        current?.currentPeriodEnd && new Date(current.currentPeriodEnd) > now
+          ? new Date(current.currentPeriodEnd)
+          : now;
+      updateData.currentPeriodEnd = new Date(
+        baseDate.getTime() + durationDays * 86400000,
+      );
     }
 
     const subscription = await this.prisma.subscription.update({
