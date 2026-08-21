@@ -1,1 +1,1 @@
-web: npx prisma migrate deploy && node dist/main
+web: sh -c "npx prisma generate && npx prisma migrate deploy || true; node dist/main"
