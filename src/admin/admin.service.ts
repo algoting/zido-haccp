@@ -52,7 +52,7 @@ export class AdminService {
       await this.prisma.billingEvent.create({
         data: {
           subscriptionId,
-          type: 'STATUS_CHANGE' as any,
+          type: status === 'CANCELED' ? 'SUBSCRIPTION_CANCELED' : 'SUBSCRIPTION_UPDATED',
           description: `Abonnement mis à jour (Plan: ${subscription.plan}, Statut: ${subscription.status}). ${notes ? 'Notes: ' + notes : ''}`,
         },
       });
