@@ -1,0 +1,119 @@
+# ============================================================================
+# Docker Compose - HACCP API Production (Hostinger VPS)
+# ============================================================================
+# Usage:
+#   docker compose -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.prod.yml logs -f api
+#   docker compose -f docker-compose.prod.yml down
+# ============================================================================
+
+services:
+  # --------------------------------------------------------------------------
+  # PostgreSQL Database (self-hosted, replaces Google Cloud SQL)
+  # --------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: haccp-postgres
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:5432:5432'
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-haccp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-haccp_prod}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U haccp -d haccp_prod']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - haccp-network
+    # Harden: only accept connections from the Docker network
+    command: >
+      postgres
+        -c listen_addresses='*'
+        -c max_connections=200
+        -c shared_buffers=256MB
+        -c effective_cache_size=512MB
+        -c work_mem=4MB
+        -c maintenance_work_mem=64MB
+        -c log_min_duration_statement=1000
+
+  # --------------------------------------------------------------------------
+  # Automated daily backups
+  # --------------------------------------------------------------------------
+  pg-backup:
+    image: postgres:16-alpine
+    container_name: haccp-pg-backup
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-haccp}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-haccp_prod}
+    volumes:
+      - ./backups:/backups
+    networks:
+      - haccp-network
+    # Run pg_dump every day at 02:00 UTC, keep last 14 days
+    entrypoint: /bin/sh
+    command: >
+      -c "
+        while true; do
+          STAMP=$$(date +%Y-%m-%d_%H%M%S);
+          echo \"[$$STAMP] Starting backup...\";
+          pg_dump -Fc -f /backups/haccp_prod_$$STAMP.dump;
+          echo \"[$$STAMP] Backup done.\";
+          # Delete backups older than 14 days
+          find /backups -name '*.dump' -mtime +14 -delete;
+          echo \"Next backup in 24h.\";
+          sleep 86400;
+        done
+      "
+
+  # --------------------------------------------------------------------------
+  # HACCP API
+  # --------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    container_name: haccp-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - '3000:3000'
+    env_file:
+      - .env.production
+    volumes:
+      - ./uploads:/app/uploads
+    networks:
+      - haccp-network
+    healthcheck:
+      test: ['CMD', 'node', '-e', "require('http').get('http://localhost:3000/health/liveness', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    command: >
+      sh -c "
+        npx prisma generate &&
+        npx prisma migrate deploy &&
+        node dist/main
+      "
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  haccp-network:
+    driver: bridge

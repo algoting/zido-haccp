@@ -1,0 +1,178 @@
+# ============================================================================
+# Kubernetes Deployment - HACCP API
+# ============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: haccp-api
+  namespace: haccp-app
+  labels:
+    app: haccp-api
+    version: v1
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: haccp-api
+  template:
+    metadata:
+      labels:
+        app: haccp-api
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/metrics"
+    spec:
+      # Use service account with GCP permissions
+      serviceAccountName: haccp-api-sa
+      
+      # Init container to run migrations
+      initContainers:
+        - name: migrations
+          image: your-registry/haccp-api:latest
+          command: ['npx', 'prisma', 'migrate', 'deploy']
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: haccp-api-secrets
+                  key: DATABASE_URL
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+      
+      containers:
+        - name: api
+          image: your-registry/haccp-api:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          
+          # Environment variables from ConfigMap
+          envFrom:
+            - configMapRef:
+                name: haccp-api-config
+          
+          # Environment variables from Secrets
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: haccp-api-secrets
+                  key: DATABASE_URL
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: haccp-api-secrets
+                  key: JWT_SECRET
+            - name: STRIPE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: haccp-api-secrets
+                  key: STRIPE_API_KEY
+            - name: STRIPE_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: haccp-api-secrets
+                  key: STRIPE_WEBHOOK_SECRET
+            - name: STRIPE_PRICE_ID
+              valueFrom:
+                secretKeyRef:
+                  name: haccp-api-secrets
+                  key: STRIPE_PRICE_ID
+            - name: SENTRY_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: haccp-api-secrets
+                  key: SENTRY_DSN
+            - name: GCP_PROJECT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: haccp-api-secrets
+                  key: GCP_PROJECT_ID
+          
+          # Resource limits
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          
+          # Liveness probe
+          livenessProbe:
+            httpGet:
+              path: /health/liveness
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          
+          # Readiness probe
+          readinessProbe:
+            httpGet:
+              path: /health/readiness
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          
+          # Security context
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+          
+          # Volume mounts
+          volumeMounts:
+            - name: uploads
+              mountPath: /app/uploads
+            - name: gcp-key
+              mountPath: /app/secrets
+              readOnly: true
+      
+      # Volumes
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: haccp-uploads-pvc
+        - name: gcp-key
+          secret:
+            secretName: gcp-service-account-key
+            items:
+              - key: key.json
+                path: gcp-key.json
+      
+      # Pod disruption budget for high availability
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - haccp-api
+                topologyKey: kubernetes.io/hostname

@@ -1,0 +1,118 @@
+# ============================================================================
+# GitHub Actions - Database Migrations
+# ============================================================================
+# Runs on: Manual trigger
+# Purpose: Run Prisma migrations in specific environments
+# ============================================================================
+
+name: Run Database Migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to run migrations'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      dry-run:
+        description: 'Dry run (preview changes only)'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  migrate:
+    name: Run Migrations
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Set database URL
+        run: |
+          if [ "${{ github.event.inputs.environment }}" == "staging" ]; then
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL_STAGING }}" >> $GITHUB_ENV
+          else
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL_PRODUCTION }}" >> $GITHUB_ENV
+          fi
+
+      - name: Preview migrations (dry-run)
+        if: github.event.inputs.dry-run == 'true'
+        run: |
+          echo "🔍 Previewing migrations..."
+          npx prisma migrate status
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+
+      - name: Run migrations
+        if: github.event.inputs.dry-run == 'false'
+        run: |
+          echo "🚀 Running migrations..."
+          npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+
+      - name: Verify migrations
+        if: github.event.inputs.dry-run == 'false'
+        run: |
+          echo "✅ Verifying migrations..."
+          npx prisma migrate status
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+
+      - name: Notify on success
+        if: success() && github.event.inputs.dry-run == 'false'
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "✅ Database migrations completed successfully in ${{ github.event.inputs.environment }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Database Migrations Successful* :white_check_mark:\n\n*Environment:* ${{ github.event.inputs.environment }}\n*Triggered by:* ${{ github.actor }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "❌ Database migrations failed in ${{ github.event.inputs.environment }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Database Migrations Failed* :x:\n\n*Environment:* ${{ github.event.inputs.environment }}\n*Triggered by:* ${{ github.actor }}\n*Check logs:* ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

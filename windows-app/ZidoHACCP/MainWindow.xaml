@@ -1,0 +1,18 @@
+<Window x:Class="ZidoHACCP.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Zido HACCP — Sécurité Alimentaire &amp; Contrôle Sanitaire" 
+        Height="850" Width="1300"
+        WindowStartupLocation="CenterScreen"
+        Icon="app.ico"
+        Background="#0D9488">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        
+        <wv2:WebView2 Name="webView" Grid.Row="1" Source="https://zido-haccp.online/"/>
+    </Grid>
+</Window>

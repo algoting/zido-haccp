@@ -1,0 +1,93 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: haccp-postgres
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:5432:5432'
+    environment:
+      POSTGRES_USER: haccp
+      POSTGRES_PASSWORD: HaccpSecurePassword2026!
+      POSTGRES_DB: haccp_prod
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U haccp -d haccp_prod || pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - haccp-network
+
+  pg-backup:
+    image: postgres:16-alpine
+    container_name: haccp-pg-backup
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: haccp
+      PGPASSWORD: HaccpSecurePassword2026!
+      PGDATABASE: haccp_prod
+    volumes:
+      - ./backups:/backups
+    networks:
+      - haccp-network
+    entrypoint: /bin/sh
+    command: >
+      -c "
+        mkdir -p /backups;
+        while true; do
+          STAMP=$$(date +%Y-%m-%d_%H%M%S);
+          pg_dump -Fc -f /backups/haccp_prod_$$STAMP.dump || true;
+          find /backups -name '*.dump' -mtime +14 -delete || true;
+          sleep 86400;
+        done
+      "
+
+  api:
+    image: haccp-app-api:latest
+    container_name: haccp-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - '3000:3000'
+      - '5173:5173'
+      - '5174:5174'
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://haccp:HaccpSecurePassword2026!@postgres:5432/haccp_prod?schema=public
+      JWT_SECRET: ZidoHaccpSuperJwtSecretKey2026!
+      JWT_EXPIRES_IN: 7d
+      HOSTINGER_API_TOKEN: 7233c0dc3e271f82b39b2ec2b223c6f8695a98ca8bbbb10371226506526799e6
+      SMTP_HOST: smtp.hostinger.com
+      SMTP_PORT: 465
+      SMTP_SECURE: "true"
+      SMTP_USER: contact@zido-haccp.online
+      SMTP_PASSWORD: 7233c0dc3e271f82b39b2ec2b223c6f8695a98ca8bbbb10371226506526799e6
+      SMTP_FROM: contact@zido-haccp.online
+      FRONTEND_URL: https://zido-haccp.online
+    volumes:
+      - ./uploads:/app/uploads
+    networks:
+      - haccp-network
+    command: >
+      sh -c "
+        npx prisma generate &&
+        npx prisma migrate deploy &&
+        node dist/main
+      "
+
+volumes:
+  postgres_data:
+
+networks:
+  haccp-network:
+    driver: bridge

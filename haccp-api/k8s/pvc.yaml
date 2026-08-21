@@ -1,0 +1,15 @@
+# ============================================================================
+# Kubernetes PersistentVolumeClaim - File uploads storage
+# ============================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: haccp-uploads-pvc
+  namespace: haccp-app
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard

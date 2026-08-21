@@ -1,0 +1,23 @@
+# ============================================================================
+# Kubernetes Service - HACCP API
+# ============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: haccp-api-service
+  namespace: haccp-app
+  labels:
+    app: haccp-api
+spec:
+  type: ClusterIP
+  selector:
+    app: haccp-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+      protocol: TCP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600

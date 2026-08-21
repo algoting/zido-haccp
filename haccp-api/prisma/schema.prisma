@@ -1,0 +1,734 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                      String              @id @default(uuid())
+  email                   String              @unique
+  role                    UserRole
+  displayName             String?
+  profilePictureUrl       String?
+  createdAt               DateTime            @default(now())
+  passwordHash            String?
+  passwordResetToken      String?
+  passwordResetExpires    DateTime?
+  emailVerified           Boolean             @default(false)
+  emailVerificationToken  String?
+  suspended               Boolean             @default(false)
+  establishmentId         String?
+  expoPushToken           String?
+  auditLogsCreated        AuditLog[]          @relation("UserAuditLogs")
+  correctiveActions       CorrectiveAction[]
+  createdEquipment        Equipment[]
+  ownedEstablishment      Establishment?      @relation("EstablishmentOwner")
+  closedIncidents         Incident[]
+  notificationEvents      NotificationEvent[] @relation("UserNotificationEvents")
+  recordedTemperatureLogs TemperatureLog[]
+  establishment           Establishment?      @relation("EstablishmentMembers", fields: [establishmentId], references: [id])
+  cleaningTaskChecks      CleaningTaskCheck[]  @relation("CleaningTaskCheckedBy")
+  oilChecksRecorded       OilCheck[]          @relation("RecordedBy")
+  supportTicketsCreated   SupportTicket[]         @relation("CreatedBy")
+  supportMessages         SupportMessage[]        @relation("SentBy")
+  productsCreated         Product[]               @relation("ProductCreatedBy")
+  internalPreparationsCreated InternalPreparation[] @relation("UserInternalPreparations")
+  batchesCreated          PreparationBatch[]      @relation("UserPreparationBatches")
+  batchesDestroyed        PreparationBatch[]      @relation("UserDestroyedBatches")
+  goodsReceptionsCreated  GoodsReception[]        @relation("ReceptionCreatedBy")
+  tempTrackingsCreated    TempTracking[]          @relation("UserTempTrackings")
+}
+
+model Establishment {
+  id                 String              @id @default(uuid())
+  name               String
+  logoUrl            String?
+  address            String?
+  phone              String?
+  description        String?
+  timezone           String              @default("Europe/Paris")
+  active             Boolean             @default(true)
+  ownerId            String              @unique
+  createdAt          DateTime            @default(now())
+  auditLogs          AuditLog[]          @relation("EstablishmentAuditLogs")
+  equipment          Equipment[]
+  owner              User                @relation("EstablishmentOwner", fields: [ownerId], references: [id])
+  incidents          Incident[]
+  notificationEvents NotificationEvent[] @relation("EstablishmentNotificationEvents")
+  temperatureLogs    TemperatureLog[]
+  members            User[]              @relation("EstablishmentMembers")
+  subscription       Subscription?
+  cleaningSectors    CleaningSector[]    @relation("EstablishmentCleaningSectors")
+  cleaningPlans      CleaningPlan[]      @relation("EstablishmentCleaningPlans")
+  oilStations        OilStation[]
+  supportTickets     SupportTicket[]
+  pmsDocuments       PmsDocument[]
+  exportJobs         ExportJob[]
+  products           Product[]           @relation("EstablishmentProducts")
+  internalPreparations InternalPreparation[] @relation("EstablishmentInternalPreparations")
+  preparationBatches PreparationBatch[]  @relation("EstablishmentPreparationBatches")
+  suppliers          Supplier[]          @relation("EstablishmentSuppliers")
+  goodsReceptions    GoodsReception[]    @relation("EstablishmentReceptions")
+  equipmentSectors   EquipmentSector[]   @relation("EstablishmentEquipmentSectors")
+  tempTrackings      TempTracking[]      @relation("EstablishmentTempTrackings")
+}
+
+model EquipmentSector {
+  id              String        @id @default(uuid())
+  establishmentId String
+  name            String
+  order           Int           @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  establishment   Establishment @relation("EstablishmentEquipmentSectors", fields: [establishmentId], references: [id])
+  equipment       Equipment[]
+
+  @@unique([establishmentId, name])
+  @@index([establishmentId])
+}
+
+model Equipment {
+  id              String            @id @default(uuid())
+  establishmentId String
+  sectorId        String?
+  name            String
+  type            String
+  minTempC        Float?
+  maxTempC        Float?
+  status          EquipmentStatus   @default(ACTIVE)
+  createdByUserId String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  // Sopalogs RabbitMQ integration
+  sopalogDeviceId String?           // Sopalogs device ID (e.g., "30008745")
+  
+  sector          EquipmentSector?  @relation(fields: [sectorId], references: [id])
+  createdBy       User              @relation(fields: [createdByUserId], references: [id])
+  establishment   Establishment     @relation(fields: [establishmentId], references: [id])
+  incidents       Incident[]
+  temperatureLogs TemperatureLog[]
+
+  @@index([establishmentId])
+  @@index([sectorId])
+  @@index([status])
+  @@index([sopalogDeviceId])
+}
+
+model TemperatureLog {
+  id                String                @id @default(uuid())
+  equipmentId       String
+  establishmentId   String
+  temperatureC      Float
+  measuredAt        DateTime
+  conformity        TemperatureConformity
+  recordedByUserId  String?
+  createdAt         DateTime              @default(now())
+  triggeredIncident Incident?
+  equipment         Equipment             @relation(fields: [equipmentId], references: [id])
+  establishment     Establishment         @relation(fields: [establishmentId], references: [id])
+  recordedBy        User?                 @relation(fields: [recordedByUserId], references: [id])
+
+  @@index([establishmentId])
+  @@index([equipmentId, measuredAt])
+}
+
+model Incident {
+  id                      String             @id @default(uuid())
+  type                    IncidentType
+  status                  IncidentStatus     @default(OPEN)
+  establishmentId         String
+  equipmentId             String
+  triggerTemperatureLogId String             @unique
+  openedAt                DateTime           @default(now())
+  closedAt                DateTime?
+  closedByUserId          String?
+  correctiveActions       CorrectiveAction[]
+  closedBy                User?              @relation(fields: [closedByUserId], references: [id])
+  equipment               Equipment          @relation(fields: [equipmentId], references: [id])
+  establishment           Establishment      @relation(fields: [establishmentId], references: [id])
+  triggerTemperatureLog   TemperatureLog     @relation(fields: [triggerTemperatureLogId], references: [id])
+
+  @@index([establishmentId])
+  @@index([equipmentId])
+  @@index([status, openedAt])
+}
+
+model CorrectiveAction {
+  id              String   @id @default(uuid())
+  incidentId      String
+  actionText      String
+  createdByUserId String
+  createdAt       DateTime @default(now())
+  createdBy       User     @relation(fields: [createdByUserId], references: [id])
+  incident        Incident @relation(fields: [incidentId], references: [id])
+}
+
+model AuditLog {
+  id              String        @id @default(uuid())
+  establishmentId String
+  actorUserId     String?
+  action          AuditAction
+  entityType      String
+  entityId        String?
+  beforeJson      Json?
+  afterJson       Json?
+  ip              String?
+  userAgent       String?
+  createdAt       DateTime      @default(now())
+  actor           User?         @relation("UserAuditLogs", fields: [actorUserId], references: [id])
+  establishment   Establishment @relation("EstablishmentAuditLogs", fields: [establishmentId], references: [id])
+
+  @@index([establishmentId, createdAt])
+  @@index([action, createdAt])
+  @@index([entityType, entityId])
+}
+
+model NotificationEvent {
+  id              String                @id @default(uuid())
+  establishmentId String
+  userId          String?
+  type            NotificationEventType
+  channel         NotificationChannel   @default(IN_APP)
+  status          NotificationStatus    @default(PENDING)
+  titleKey        String
+  bodyKey         String
+  payloadJson     Json?
+  scheduledAt     DateTime              @default(now())
+  sentAt          DateTime?
+  errorMessage    String?
+  createdAt       DateTime              @default(now())
+  establishment   Establishment         @relation("EstablishmentNotificationEvents", fields: [establishmentId], references: [id])
+  user            User?                 @relation("UserNotificationEvents", fields: [userId], references: [id])
+
+  @@index([establishmentId, status, scheduledAt])
+  @@index([type, createdAt])
+  @@index([userId, status])
+}
+
+model Subscription {
+  id                  String                @id @default(uuid())
+  establishmentId     String                @unique
+  plan                SubscriptionPlan      @default(CONNECT)
+  status              SubscriptionStatus    @default(ACTIVE)
+  currentPeriodEnd    DateTime
+  lastPaymentAt       DateTime?
+  stripeCustomerId    String?
+  stripeSubscriptionId String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  establishment       Establishment         @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
+  billingEvents       BillingEvent[]
+
+  @@index([status])
+  @@index([establishmentId])
+}
+
+model BillingEvent {
+  id              String            @id @default(uuid())
+  subscriptionId  String
+  type            BillingEventType
+  stripeEventId   String?           @unique
+  amount          Int?
+  currency        String            @default("EUR")
+  description     String?
+  metadata        Json?
+  createdAt       DateTime          @default(now())
+  subscription    Subscription      @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@index([type, createdAt])
+}
+
+model CleaningSector {
+  id              String              @id @default(uuid())
+  establishmentId String
+  name            String
+  icon            String              @default("🏢")
+  order           Int                 @default(0)
+  isSystemZone    Boolean             @default(false)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  establishment   Establishment       @relation("EstablishmentCleaningSectors", fields: [establishmentId], references: [id], onDelete: Cascade)
+  subSectors      CleaningSubSector[]
+
+  @@unique([establishmentId, name])
+  @@index([establishmentId])
+}
+
+model CleaningSubSector {
+  id              String              @id @default(uuid())
+  sectorId        String
+  name            String
+  icon            String              @default("📍")
+  order           Int                 @default(0)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  sector          CleaningSector      @relation(fields: [sectorId], references: [id], onDelete: Cascade)
+  equipment       CleaningEquipment[]
+
+  @@unique([sectorId, name])
+  @@index([sectorId])
+}
+
+model CleaningEquipment {
+  id              String              @id @default(uuid())
+  subSectorId     String
+  name            String
+  order           Int                 @default(0)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  subSector       CleaningSubSector   @relation(fields: [subSectorId], references: [id], onDelete: Cascade)
+  tasks           CleaningTask[]
+
+  @@unique([subSectorId, name])
+  @@index([subSectorId])
+}
+
+model CleaningTask {
+  id              String              @id @default(uuid())
+  equipmentId     String
+  name            String
+  frequency       CleaningFrequency   @default(DAILY)
+  order           Int                 @default(0)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  equipment       CleaningEquipment   @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  checks          CleaningTaskCheck[]
+
+  @@unique([equipmentId, name])
+  @@index([equipmentId])
+}
+
+model CleaningPlan {
+  id              String              @id @default(uuid())
+  establishmentId String
+  dateKey         String
+  completedAt     DateTime?
+  createdAt       DateTime            @default(now())
+  establishment   Establishment       @relation("EstablishmentCleaningPlans", fields: [establishmentId], references: [id], onDelete: Cascade)
+  taskChecks      CleaningTaskCheck[]
+
+  @@unique([establishmentId, dateKey])
+  @@index([establishmentId])
+  @@index([dateKey])
+}
+
+model CleaningTaskCheck {
+  id              String              @id @default(uuid())
+  planId          String
+  taskId          String
+  checkedByUserId String
+  checkedAt       DateTime            @default(now())
+  plan            CleaningPlan        @relation(fields: [planId], references: [id], onDelete: Cascade)
+  task            CleaningTask        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  checkedBy       User                @relation("CleaningTaskCheckedBy", fields: [checkedByUserId], references: [id])
+
+  @@unique([planId, taskId])
+  @@index([planId])
+  @@index([taskId])
+  @@index([checkedByUserId])
+}
+
+model OilStation {
+  id              String            @id @default(uuid())
+  establishmentId String
+  name            String
+  active          Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  establishment   Establishment     @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
+  checks          OilCheck[]
+
+  @@index([establishmentId])
+}
+
+model OilCheck {
+  id              String            @id @default(uuid())
+  stationId       String
+  quality         OilQuality
+  oilChanged      Boolean           @default(false)
+  polarity        Int?
+  method          String
+  notes           String?
+  recordedByUserId String
+  createdAt       DateTime          @default(now())
+  station         OilStation        @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  recordedBy      User              @relation("RecordedBy", fields: [recordedByUserId], references: [id])
+
+  @@index([stationId, createdAt])
+}
+
+model SupportTicket {
+  id              String            @id @default(uuid())
+  establishmentId String
+  category        SupportCategory
+  status          SupportTicketStatus @default(OPEN)
+  createdByUserId String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  establishment   Establishment     @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
+  createdBy       User              @relation("CreatedBy", fields: [createdByUserId], references: [id])
+  messages        SupportMessage[]
+
+  @@index([establishmentId, status])
+  @@index([createdAt])
+}
+
+model SupportMessage {
+  id              String            @id @default(uuid())
+  ticketId        String
+  senderUserId    String
+  message         String
+  attachmentUrl   String?
+  createdAt       DateTime          @default(now())
+  ticket          SupportTicket     @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender          User              @relation("SentBy", fields: [senderUserId], references: [id])
+
+  @@index([ticketId])
+}
+
+model PmsDocument {
+  id              String            @id @default(uuid())
+  establishmentId String
+  fileUrl         String
+  originalName    String
+  notes           String?
+  uploadedByUserId String
+  uploadedAt      DateTime          @default(now())
+  establishment   Establishment     @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
+
+  @@index([establishmentId])
+}
+
+model ExportJob {
+  id              String            @id @default(uuid())
+  establishmentId String
+  status          ExportJobStatus   @default(PENDING)
+  periodStart     DateTime
+  periodEnd       DateTime
+  fileUrl         String?
+  errorMessage    String?
+  createdAt       DateTime          @default(now())
+  completedAt     DateTime?
+  establishment   Establishment     @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
+
+  @@index([establishmentId, status])
+  @@index([createdAt])
+}
+
+model Product {
+  id              String           @id @default(uuid())
+  establishmentId String
+  name            String
+  supplier        String
+  batchNumber     String
+  expiryDate      DateTime
+  quantity        Int
+  quantityUnit    String           @default("kg") // kg, L, pieces, boxes, etc.
+  storageLocation String
+  classification  String           @default("")
+  createdBy       String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  establishment   Establishment    @relation("EstablishmentProducts", fields: [establishmentId], references: [id], onDelete: Cascade)
+  creator         User             @relation("ProductCreatedBy", fields: [createdBy], references: [id])
+  photos          ProductPhoto[]
+
+  @@index([establishmentId, createdAt])
+  @@index([createdBy])
+}
+
+model ProductPhoto {
+  id        String   @id @default(uuid())
+  productId String
+  photoUrl  String
+  uploadedAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+enum UserRole {
+  PLATFORM_ADMIN
+  OWNER
+  STAFF
+  AUDITOR
+}
+
+enum EquipmentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TemperatureConformity {
+  OK
+  OUT_OF_RANGE
+}
+
+enum IncidentStatus {
+  OPEN
+  CLOSED
+}
+
+enum IncidentType {
+  TEMPERATURE
+}
+
+enum AuditAction {
+  EQUIPMENT_CREATED
+  EQUIPMENT_UPDATED
+  EQUIPMENT_DEACTIVATED
+  SOPALOG_CONNECTED
+  SOPALOG_DISCONNECTED
+  CLEANING_TEMPLATE_UPSERTED
+  CLEANING_RUN_COMPLETED
+  OIL_STATION_CREATED
+  OIL_CHECK_RECORDED
+  PMS_UPLOADED
+  PMS_DELETED
+  EXPORT_GENERATED
+  SUPPORT_TICKET_CREATED
+  SUPPORT_MESSAGE_ADDED
+  SUBSCRIPTION_STATUS_CHANGED
+  TEMPERATURE_LOG_CREATED
+  INCIDENT_CREATED
+  INCIDENT_CLOSED
+  CORRECTIVE_ACTION_ADDED
+  PRODUCT_CREATED
+  PRODUCT_DELETED
+  INTERNAL_PREPARATION_CREATED
+  INTERNAL_PREPARATION_UPDATED
+  INTERNAL_PREPARATION_DELETED
+  PREPARATION_BATCH_CREATED
+  PREPARATION_BATCH_DESTROYED
+  SUPPLIER_CREATED
+  SUPPLIER_UPDATED
+  SUPPLIER_DELETED
+  RECEPTION_CREATED
+  RECEPTION_UPDATED
+  RECEPTION_DELETED
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  PUSH
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+enum NotificationEventType {
+  TEMP_OUT_OF_RANGE
+  TEMP_LOG_DUE_SOON
+  TEMP_LOG_OVERDUE
+  CLEANING_OVERDUE
+  TEMP_LOG_DUE
+  INCIDENT_OPENED
+  INCIDENT_CLOSED
+}
+
+enum CleaningFrequency {
+  DAILY
+  WEEKLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  LOCKED_MANUAL
+}
+
+enum SubscriptionPlan {
+  CONNECT
+  PRO_SUIVI
+  SERENITE
+}
+
+enum BillingEventType {
+  INVOICE_CREATED
+  INVOICE_PAID
+  INVOICE_FAILED
+  CHARGE_FAILED
+  SUBSCRIPTION_CREATED
+  SUBSCRIPTION_UPDATED
+  SUBSCRIPTION_CANCELED
+}
+
+enum OilQuality {
+  GOOD
+  BAD
+}
+
+enum SupportCategory {
+  PAYMENT
+  CONFIGURATION
+  BUG
+  OTHER
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum ExportJobStatus {
+  PENDING
+  READY
+  FAILED
+}
+
+enum BatchStatus {
+  PREPARED
+  STORED
+  VALID
+  EXPIRING_SOON
+  EXPIRED
+  DESTROYED
+}
+
+model InternalPreparation {
+  id             String             @id @default(uuid())
+  name           String
+  category       String
+  shelfLifeDays  Int
+  shelfLifeHours Int
+  establishmentId String
+  createdByUserId String
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  establishment  Establishment      @relation("EstablishmentInternalPreparations", fields: [establishmentId], references: [id])
+  createdBy      User               @relation("UserInternalPreparations", fields: [createdByUserId], references: [id])
+  batches        PreparationBatch[]
+
+  @@index([establishmentId])
+}
+
+model PreparationBatch {
+  id                     String               @id @default(uuid())
+  batchId                String               @unique
+  name                   String?
+  internalPreparationId  String?
+  shelfLifeDays          Int?
+  shelfLifeHours         Int?
+  photoUrl               String?
+  quantity               Float
+  unit                   String               @default("kg")
+  productionDateTime     DateTime
+  dlc                    DateTime
+  status                 BatchStatus          @default(PREPARED)
+  establishmentId        String
+  createdByUserId        String
+  destroyedAt            DateTime?
+  destroyedByUserId      String?
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  internalPreparation    InternalPreparation? @relation(fields: [internalPreparationId], references: [id])
+  establishment          Establishment        @relation("EstablishmentPreparationBatches", fields: [establishmentId], references: [id])
+  createdBy              User                 @relation("UserPreparationBatches", fields: [createdByUserId], references: [id])
+  destroyedBy            User?                @relation("UserDestroyedBatches", fields: [destroyedByUserId], references: [id])
+
+  @@index([establishmentId])
+  @@index([status])
+  @@index([dlc])
+}
+
+// ========================================================================
+// SUPPLIERS & GOODS RECEPTION
+// ========================================================================
+
+enum ReceptionCategory {
+  FRAIS
+  SEC
+  SURGELE
+}
+
+model Supplier {
+  id              String           @id @default(uuid())
+  establishmentId String
+  name            String
+  phone           String?
+  email           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  establishment   Establishment    @relation("EstablishmentSuppliers", fields: [establishmentId], references: [id], onDelete: Cascade)
+  receptions      GoodsReception[]
+
+  @@index([establishmentId])
+}
+
+model GoodsReception {
+  id              String              @id @default(uuid())
+  establishmentId String
+  supplierId      String
+  category        ReceptionCategory
+  temperature     Float?
+  orderNumber     String?
+  invoiceNumber   String?
+  packagingOk     Boolean             @default(true)
+  createdBy       String
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  establishment   Establishment       @relation("EstablishmentReceptions", fields: [establishmentId], references: [id], onDelete: Cascade)
+  supplier        Supplier            @relation(fields: [supplierId], references: [id])
+  creator         User                @relation("ReceptionCreatedBy", fields: [createdBy], references: [id])
+  photos          GoodsReceptionPhoto[]
+
+  @@index([establishmentId, createdAt])
+  @@index([supplierId])
+  @@index([createdBy])
+}
+
+// ========================================================================
+// TEMPERATURE TRACKING (Suivi de température)
+// ========================================================================
+
+enum TempTrackingAction {
+  CUISSON
+  REFROIDISSEMENT
+  MAINTIEN_CHAUD
+  SURGELATION
+}
+
+model TempTracking {
+  id              String             @id @default(uuid())
+  action          TempTrackingAction
+  productName     String?
+  photoUrl        String?
+  startTime       DateTime
+  startTemp       Float
+  endTime         DateTime?
+  endTemp         Float?
+  establishmentId String
+  createdByUserId String
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  establishment   Establishment      @relation("EstablishmentTempTrackings", fields: [establishmentId], references: [id], onDelete: Cascade)
+  createdBy       User               @relation("UserTempTrackings", fields: [createdByUserId], references: [id])
+
+  @@index([establishmentId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model GoodsReceptionPhoto {
+  id          String         @id @default(uuid())
+  receptionId String
+  photoUrl    String
+  uploadedAt  DateTime       @default(now())
+  reception   GoodsReception @relation(fields: [receptionId], references: [id], onDelete: Cascade)
+
+  @@index([receptionId])
+}

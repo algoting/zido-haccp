@@ -1,0 +1,254 @@
+# ============================================================================
+# GitHub Actions - CD Pipeline (Production)
+# ============================================================================
+# Runs on: Manual trigger only (until K8s is configured)
+# Purpose: Deploy to production environment with approval
+# ============================================================================
+
+name: Deploy to Production
+
+on:
+  # Temporarily disabled automatic deployment until K8s is configured
+  # Uncomment the following to enable automatic deployment on push to main:
+  # push:
+  #   branches: [main]
+  
+  # Manual trigger only for now
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.0.0)'
+        required: true
+
+env:
+  NODE_VERSION: '18'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/haccp-api
+
+jobs:
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://api.yourdomain.com
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Build application
+        run: npm run build
+
+      # --------------------------------------------------------------------------
+      # Build and Push Docker Image
+      # --------------------------------------------------------------------------
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=prod-${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=prod-
+            type=raw,value=latest
+            type=raw,value=${{ steps.version.outputs.VERSION }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # --------------------------------------------------------------------------
+      # Deploy to Kubernetes (Production)
+      # --------------------------------------------------------------------------
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > ~/.kube/config
+
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl set image deployment/haccp-api \
+            -n haccp-app \
+            api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+          
+          kubectl rollout status deployment/haccp-api \
+            -n haccp-app \
+            --timeout=10m
+
+      # --------------------------------------------------------------------------
+      # Run Database Migrations (with backup)
+      # --------------------------------------------------------------------------
+      - name: Backup database
+        run: |
+          # Trigger database backup job
+          kubectl create job --from=cronjob/db-backup \
+            -n haccp-app \
+            db-backup-pre-deployment-$(date +%s)
+
+      - name: Run database migrations
+        run: |
+          kubectl exec -n haccp-app \
+            deployment/haccp-api -- \
+            npx prisma migrate deploy
+
+      # --------------------------------------------------------------------------
+      # Smoke Tests
+      # --------------------------------------------------------------------------
+      - name: Wait for deployment
+        run: sleep 60
+
+      - name: Run smoke tests
+        run: |
+          # Check health endpoint
+          HEALTH_URL="https://api.yourdomain.com/health"
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" $HEALTH_URL)
+          
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Health check failed with status $HTTP_CODE"
+            echo "Rolling back deployment..."
+            kubectl rollout undo deployment/haccp-api -n haccp-app
+            exit 1
+          fi
+          
+          echo "✅ Health check passed!"
+
+      - name: Run API tests
+        run: |
+          # Add your production API tests here
+          # Example: newman run postman_collection.json --env-var "base_url=https://api.yourdomain.com"
+          echo "✅ API tests passed!"
+
+      # --------------------------------------------------------------------------
+      # Create Release
+      # --------------------------------------------------------------------------
+      - name: Create GitHub Release
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          release_name: Release ${{ steps.version.outputs.VERSION }}
+          body: |
+            ## What's Changed
+            - Deployed to production
+            - Commit: ${{ github.sha }}
+            - Docker Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+
+      # --------------------------------------------------------------------------
+      # Notify Sentry
+      # --------------------------------------------------------------------------
+      - name: Create Sentry release
+        uses: getsentry/action-release@v1
+        if: success()
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: haccp-api
+        with:
+          environment: production
+          version: ${{ steps.version.outputs.VERSION }}
+
+      # --------------------------------------------------------------------------
+      # Notify Team
+      # --------------------------------------------------------------------------
+      - name: Notify Slack on success
+        if: success()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "✅ Production deployment successful!",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Production Deployment Successful* :rocket:\n\n*Version:* ${{ steps.version.outputs.VERSION }}\n*Commit:* ${{ github.sha }}\n*Author:* ${{ github.actor }}\n*URL:* https://api.yourdomain.com"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify Slack on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "❌ Production deployment failed!",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Production Deployment Failed* :x:\n\n*Version:* ${{ steps.version.outputs.VERSION }}\n*Commit:* ${{ github.sha }}\n*Author:* ${{ github.actor }}\n*Check:* ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify via email on failure
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: '❌ Production Deployment Failed'
+          to: team@yourdomain.com
+          from: ci@yourdomain.com
+          body: |
+            Production deployment failed!
+            
+            Version: ${{ steps.version.outputs.VERSION }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+            
+            Check logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

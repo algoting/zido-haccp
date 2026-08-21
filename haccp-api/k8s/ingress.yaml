@@ -1,0 +1,48 @@
+# ============================================================================
+# Kubernetes Ingress - HACCP API
+# ============================================================================
+# This example uses nginx-ingress-controller with cert-manager for TLS
+# Adjust for your ingress controller (Traefik, ALB, etc.)
+# ============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: haccp-api-ingress
+  namespace: haccp-app
+  annotations:
+    # Nginx ingress controller annotations
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # Rate limiting
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-connections: "10"
+    
+    # CORS (if needed)
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://app.yourdomain.com"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    
+    # Client body size for file uploads
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    
+    # cert-manager annotations for automatic TLS
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+    - hosts:
+        - api.yourdomain.com
+      secretName: haccp-api-tls
+  rules:
+    - host: api.yourdomain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: haccp-api-service
+                port:
+                  number: 80

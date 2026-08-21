@@ -1,0 +1,16 @@
+# ============================================================================
+# Kubernetes ConfigMap - Non-sensitive configuration
+# ============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haccp-api-config
+  namespace: haccp-app
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  LOG_LEVEL: "info"
+  API_URL: "https://api.yourdomain.com"
+  GCS_BUCKET_NAME: "haccp-app-storage"
+  ENABLE_SWAGGER: "false"
+  CORS_ORIGINS: "https://app.yourdomain.com,https://yourdomain.com"

@@ -1,0 +1,235 @@
+/**
+ * ZIDO HACCP — Official Brand Graphical Chart & Zero-Overflow Responsive System
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --header-height: 60px;
+  
+  --zido-blue: #2563eb;
+  --zido-blue-dark: #1e3a8a;
+  --zido-blue-gradient: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  
+  --haccp-green: #0d9488;
+  --haccp-green-gradient: linear-gradient(135deg, #0d9488 0%, #10b981 100%);
+  
+  --brand-navy: #0f172a;
+  --surface-bg: #f8fafc;
+  --surface-card: #ffffff;
+  --border-subtle: #e2e8f0;
+}
+
+html {
+  box-sizing: border-box !important;
+  -webkit-text-size-adjust: 100% !important;
+  scroll-behavior: smooth !important;
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+*, *::before, *::after {
+  box-sizing: inherit !important;
+}
+
+body {
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 100vh !important;
+  min-height: 100dvh !important;
+  padding-top: var(--safe-top) !important;
+  padding-bottom: var(--safe-bottom) !important;
+  background-color: var(--surface-bg) !important;
+  color: var(--brand-navy) !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  overflow-x: hidden !important;
+  touch-action: manipulation !important;
+}
+
+/* ==========================================================================
+   1. Buttons (Brand Compliant & Compact)
+   ========================================================================== */
+button, .btn {
+  font-family: inherit !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em !important;
+  border-radius: 9px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.35rem !important;
+  transition: all 0.15s ease !important;
+  cursor: pointer !important;
+}
+
+button:active, .btn:active {
+  transform: scale(0.97) !important;
+}
+
+/* Blue Action Buttons (Zido Brand Blue) */
+button.bg-blue-600,
+button[class*="bg-blue-600"],
+.btn-primary {
+  background: var(--zido-blue-gradient) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 3px 10px 0 rgba(37, 99, 235, 0.3) !important;
+}
+
+button.bg-blue-600:hover,
+.btn-primary:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%) !important;
+  box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.4) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Red Delete Buttons (🗑️) */
+button.text-red-500,
+button.text-red-600,
+button[class*="text-red"] {
+  background-color: #fef2f2 !important;
+  color: #dc2626 !important;
+  border: 1px solid #fecaca !important;
+  border-radius: 8px !important;
+  padding: 0.35rem 0.6rem !important;
+  font-weight: 600 !important;
+}
+
+button.text-red-500:hover,
+button.text-red-600:hover {
+  background-color: #fee2e2 !important;
+  border-color: #fca5a5 !important;
+}
+
+/* Blue Edit Buttons (✏️) */
+button.text-blue-600,
+button.text-gray-600 {
+  background-color: #eff6ff !important;
+  color: #2563eb !important;
+  border: 1px solid #dbeafe !important;
+  border-radius: 8px !important;
+  padding: 0.35rem 0.6rem !important;
+  font-weight: 600 !important;
+}
+
+button.text-blue-600:hover {
+  background-color: #dbeafe !important;
+  border-color: #bfdbfe !important;
+}
+
+/* Orange Remove Buttons (⏏️) */
+button.text-orange-600 {
+  background-color: #fff7ed !important;
+  color: #ea580c !important;
+  border: 1px solid #ffedd5 !important;
+  border-radius: 8px !important;
+  padding: 0.35rem 0.6rem !important;
+  font-weight: 600 !important;
+}
+
+button.text-orange-600:hover {
+  background-color: #ffedd5 !important;
+  border-color: #fed7aa !important;
+}
+
+/* ==========================================================================
+   2. Mobile & Multi-Device Zero-Overflow Layout (< 1024px)
+   ========================================================================== */
+@media (max-width: 1023.98px) {
+  .lg\:ml-72, [class*="lg:ml-72"], [class*="ml-72"] {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  #root, #root > div, .flex-1, main, .main {
+    width: 100% !important;
+    max-width: 100vw !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  main > div, .main > div, div[class*="max-w-7xl"], div[class*="px-4"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0.6rem 0.6rem 2rem 0.6rem !important;
+    margin: 0 !important;
+  }
+
+  .card, div[class*="rounded-xl"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0.8rem !important;
+    margin-bottom: 0.75rem !important;
+  }
+
+  div.flex.gap-3, div.flex.gap-2 {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    width: 100% !important;
+    gap: 0.35rem !important;
+  }
+
+  div.flex.gap-3 > input, div.flex.gap-2 > input {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    font-size: 16px !important;
+  }
+
+  div.flex.items-center.justify-between {
+    padding: 0.7rem 0.5rem !important;
+    width: 100% !important;
+    gap: 0.35rem !important;
+  }
+}
+
+
+/* ==========================================================================
+   12-LANGUAGE & RTL SUPPORT (Arabic, Tamil, Sinhala, Thai, Hindi, Chinese, etc.)
+   ========================================================================== */
+
+/* Arabic RTL & Typography */
+html[lang="ar"], [dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+html[lang="ar"] .text-left {
+  text-align: right !important;
+}
+
+html[lang="ar"] .text-right {
+  text-align: left !important;
+}
+
+html[lang="ar"] input, 
+html[lang="ar"] textarea, 
+html[lang="ar"] select {
+  text-align: right;
+  direction: rtl;
+}
+
+html[lang="ar"] input[type="number"],
+html[lang="ar"] input[type="time"],
+html[lang="ar"] input[type="date"],
+html[lang="ar"] input[type="email"],
+html[lang="ar"] input[type="password"] {
+  direction: ltr;
+  text-align: left;
+}
+
+/* Indic & Asian Font Rendering Support */
+html[lang="ta"], html[lang="hi"], html[lang="si"], html[lang="bn"], html[lang="th"], html[lang="zh"] {
+  font-feature-settings: normal;
+  letter-spacing: 0;
+}
