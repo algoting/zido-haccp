@@ -35,7 +35,25 @@ export class AdminService {
     notes?: string,
   ) {
     const updateData: any = {};
-    if (status) updateData.status = status;
+    if (status) {
+      updateData.status = status;
+      if (status === 'CANCELED') {
+        updateData.currentPeriodEnd = new Date();
+      } else if (status === 'ACTIVE' && (!durationDays || durationDays <= 0)) {
+        const current = await this.prisma.subscription.findUnique({
+          where: { id: subscriptionId },
+          select: { currentPeriodEnd: true, status: true },
+        });
+        const now = new Date();
+        if (
+          !current?.currentPeriodEnd ||
+          new Date(current.currentPeriodEnd) <= now ||
+          current.status === 'CANCELED'
+        ) {
+          updateData.currentPeriodEnd = new Date(now.getTime() + 30 * 86400000);
+        }
+      }
+    }
     if (plan) updateData.plan = plan;
     if (durationDays && durationDays > 0) {
       const current = await this.prisma.subscription.findUnique({
