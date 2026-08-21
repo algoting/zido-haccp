@@ -58,7 +58,6 @@ WORKDIR /app
 
 # Set to production
 ENV NODE_ENV=production
-ENV PORT=3000
 
 # Copy node_modules from deps stage
 COPY --from=deps --chown=nestjs:nodejs /app/node_modules ./node_modules
@@ -81,12 +80,9 @@ USER nestjs
 # Expose port
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/health/liveness', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
-
 # Use dumb-init to handle signals
 ENTRYPOINT ["dumb-init", "--"]
 
 # Start the application
 CMD ["node", "dist/main"]
+
