@@ -27,8 +27,10 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { User } from '@prisma/client';
-import { UserRole, BatchStatus } from '@prisma/client';
+import { UserRole, BatchStatus, SubscriptionPlan } from '@prisma/client';
 import { SubscriptionStateGuard } from '../common/guards/subscription-state.guard';
+import { PlanGuard } from '../common/guards/plan.guard';
+import { RequirePlan } from '../common/guards/plan.decorator';
 
 @Controller('dlc')
 @UseGuards(JwtAuthGuard, SubscriptionStateGuard)
@@ -192,6 +194,8 @@ export class DlcController {
   }
 
   @Get('batches/:id/label')
+  @UseGuards(PlanGuard)
+  @RequirePlan(SubscriptionPlan.SERENITE)
   async getLabel(@Param('id') id: string, @Res() res: Response, @CurrentUser() user: User) {
     const batch = await this.dlcService.getBatch(id, user.establishmentId!);
     if (!batch) {

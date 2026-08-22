@@ -20,6 +20,9 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { SubscriptionStateGuard } from '../common/guards/subscription-state.guard';
+import { PlanGuard } from '../common/guards/plan.guard';
+import { RequirePlan } from '../common/guards/plan.decorator';
+import { SubscriptionPlan } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { Request as ExpressRequest } from 'express';
 import type { User } from '@prisma/client';
@@ -29,7 +32,8 @@ interface AuthenticatedRequest extends ExpressRequest {
 }
 
 @Controller('temp-tracking')
-@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionStateGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionStateGuard, PlanGuard)
+@RequirePlan(SubscriptionPlan.PRO_SUIVI)
 export class TempTrackingController {
   constructor(
     private tempTrackingService: TempTrackingService,
