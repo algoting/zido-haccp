@@ -65,9 +65,11 @@ export class StripeService {
           {
             price_data: {
               currency: 'eur',
+              tax_behavior: 'inclusive',
               product_data: {
                 name: `Zido HACCP — Formule ${PLAN_NAMES[plan] || plan}`,
                 description: `Abonnement mensuel Zido HACCP (${PLAN_NAMES[plan] || plan})`,
+                tax_code: 'txcd_10000000',
               },
               unit_amount: PLAN_AMOUNTS[plan] || 5900,
               recurring: { interval: 'month' as const },
