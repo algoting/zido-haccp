@@ -46,9 +46,35 @@ export class StripeService {
   ): Promise<{ url: string }> {
     const envKey = PLAN_PRICE_ENV[plan];
     const priceId = this.config.get<string>(envKey) || this.config.get<string>('STRIPE_PRICE_ID');
-    if (!priceId) {
-      throw new Error(`Stripe price not configured for plan ${plan} (env: ${envKey})`);
-    }
+
+    const PLAN_AMOUNTS: Record<SubscriptionPlan, number> = {
+      CONNECT: 5900,
+      PRO_SUIVI: 8900,
+      SERENITE: 12900,
+    };
+
+    const PLAN_NAMES: Record<SubscriptionPlan, string> = {
+      CONNECT: 'CONNECT',
+      PRO_SUIVI: 'PRO SUIVI',
+      SERENITE: 'SÉRÉNITÉ',
+    };
+
+    const lineItems = priceId
+      ? [{ price: priceId, quantity: 1 }]
+      : [
+          {
+            price_data: {
+              currency: 'eur',
+              product_data: {
+                name: `Zido HACCP — Formule ${PLAN_NAMES[plan] || plan}`,
+                description: `Abonnement mensuel Zido HACCP (${PLAN_NAMES[plan] || plan})`,
+              },
+              unit_amount: PLAN_AMOUNTS[plan] || 5900,
+              recurring: { interval: 'month' as const },
+            },
+            quantity: 1,
+          },
+        ];
 
     // Get or create Stripe customer
     const subscription = await this.prisma.subscription.findUnique({
@@ -77,7 +103,7 @@ export class StripeService {
     const session = await this.stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
-      line_items: [{ price: priceId, quantity: 1 }],
+      line_items: lineItems as any,
       success_url: successUrl,
       cancel_url: cancelUrl,
       subscription_data: {
