@@ -78,7 +78,7 @@ async function bootstrap() {
     const express = require('express');
     const expressApp = app.getHttpAdapter().getInstance();
     expressApp.use(express.static(webPath));
-    expressApp.get('*', (req: any, res: any, next: any) => {
+    expressApp.get(/(.*)/, (req: any, res: any, next: any) => {
       if (
         req.path.startsWith('/api') ||
         req.path.startsWith('/health') ||
