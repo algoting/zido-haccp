@@ -40,7 +40,7 @@ COPY . .
 RUN npx prisma generate
 
 # Build the application
-RUN npm run build
+RUN mkdir -p web website uploads && npm run build
 
 # ----------------------------------------------------------------------------
 # Stage 3: Production
@@ -72,8 +72,8 @@ COPY --from=builder --chown=nestjs:nodejs /app/package*.json ./
 COPY --from=builder --chown=nestjs:nodejs /app/prisma ./prisma
 
 # Copy uploads directory structure (ensure it exists)
-RUN mkdir -p uploads/exports uploads/pms && \
-    chown -R nestjs:nodejs uploads
+RUN mkdir -p web website uploads/exports uploads/pms && \
+    chown -R nestjs:nodejs web website uploads
 
 # Switch to non-root user
 USER nestjs
