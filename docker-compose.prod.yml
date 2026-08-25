@@ -73,6 +73,9 @@ services:
       SMTP_USER: contact@zido-haccp.online
       SMTP_PASSWORD: 7233c0dc3e271f82b39b2ec2b223c6f8695a98ca8bbbb10371226506526799e6
       SMTP_FROM: contact@zido-haccp.online
+      SOPAC_API_KEY: ead4a10319bad07af820900cad0cca904810d61b658d8fa6d3946bf6f528ed32c511bae797ff78e9896cc5a0060091d05eef30218f5146deedb205380f35102cb3d8f563673c19cd63090def1b3d3a0160925530eb159fde81f512cc2f
+      SOPALOGS_PASSWORD: ead4a10319bad07af820900cad0cca904810d61b658d8fa6d3946bf6f528ed32c511bae797ff78e9896cc5a0060091d05eef30218f5146deedb205380f35102cb3d8f563673c19cd63090def1b3d3a0160925530eb159fde81f512cc2f
+
       FRONTEND_URL: https://zido-haccp.online
     volumes:
       - ./uploads:/app/uploads
