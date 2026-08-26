@@ -260,23 +260,47 @@
       function updatePricingButtonsDOM() {
         var buttons = document.querySelectorAll("button, a");
         buttons.forEach(function(btn) {
-          var card = btn.closest(".rounded-2xl, [class*='rounded-'], div");
+          var p = btn.parentElement;
+          var card = null;
+          for (var i = 0; i < 5; i++) {
+            if (!p || p === document.body) break;
+            var t = p.textContent || "";
+            var has59 = t.includes("59");
+            var has89 = t.includes("89");
+            var has129 = t.includes("129");
+            var hasDevis = t.toLowerCase().includes("sur devis");
+
+            var priceCount = (has59 ? 1 : 0) + (has89 ? 1 : 0) + (has129 ? 1 : 0);
+            if (priceCount === 1 || (priceCount === 0 && hasDevis)) {
+              card = p;
+              break;
+            }
+            p = p.parentElement;
+          }
+
           if (!card) return;
-          var text = (card.textContent || "").toUpperCase();
-          if (text.includes("CONNECT") && (text.includes("59") || text.includes("150"))) {
+
+          var cardText = (card.textContent || "").toUpperCase();
+          if (cardText.includes("CONNECT") || cardText.includes("59")) {
+            btn.setAttribute("data-plan-id", "CONNECT");
+            btn.setAttribute("data-plan-name", "CONNECT");
+            btn.setAttribute("data-plan-price", "59€ HT / mois");
             if (btn.textContent.includes("Nous contacter") || btn.textContent.includes("Choisir")) {
               btn.innerHTML = 'Commander & Payer (59€) <svg class="ml-2 h-4 w-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>';
-              btn.setAttribute("data-plan", "CONNECT");
             }
-          } else if (text.includes("PRO SUIVI") && (text.includes("89") || text.includes("350"))) {
+          } else if (cardText.includes("PRO SUIVI") || cardText.includes("89")) {
+            btn.setAttribute("data-plan-id", "PRO_SUIVI");
+            btn.setAttribute("data-plan-name", "PRO SUIVI");
+            btn.setAttribute("data-plan-price", "89€ HT / mois");
             if (btn.textContent.includes("Nous contacter") || btn.textContent.includes("Choisir")) {
               btn.innerHTML = 'Commander & Payer (89€) <svg class="ml-2 h-4 w-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>';
-              btn.setAttribute("data-plan", "PRO_SUIVI");
             }
-          } else if (text.includes("SÉRÉNITÉ") && (text.includes("129") || text.includes("650"))) {
+          } else if (cardText.includes("SÉRÉNITÉ") || cardText.includes("SERENITE") || cardText.includes("129")) {
+            btn.setAttribute("data-plan-id", "SERENITE");
+            btn.setAttribute("data-plan-name", "SÉRÉNITÉ");
+            btn.setAttribute("data-plan-price", "129€ HT / mois");
             if (btn.textContent.includes("Nous contacter") || btn.textContent.includes("Choisir")) {
               btn.innerHTML = 'Commander & Payer (129€) <svg class="ml-2 h-4 w-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>';
-              btn.setAttribute("data-plan", "SERENITE");
             }
           }
         });
@@ -288,33 +312,47 @@
         document.addEventListener("click", function(e) {
           var el = e.target.closest("a, button");
           if (!el) return;
-          var href = el.getAttribute("href") || "";
-          var text = (el.textContent || "").toLowerCase();
-          var planAttr = el.getAttribute("data-plan");
-          var card = el.closest(".rounded-2xl, [class*='rounded-'], div");
-          var cardText = card ? (card.textContent || "").toLowerCase() : "";
 
-          // Exclude SUR MESURE / Sur devis from opening Stripe modal
-          if (cardText.includes("sur devis") || cardText.includes("sur mesure")) {
-            return; // Let standard contact link work for custom quote
+          var planId = el.getAttribute("data-plan-id");
+          var planName = el.getAttribute("data-plan-name");
+          var planPrice = el.getAttribute("data-plan-price");
+
+          if (!planId) {
+            var p = el.parentElement;
+            for (var i = 0; i < 5; i++) {
+              if (!p || p === document.body) break;
+              var t = (p.textContent || "").toUpperCase();
+              var count = (t.includes("59") ? 1 : 0) + (t.includes("89") ? 1 : 0) + (t.includes("129") ? 1 : 0);
+              if (count === 1) {
+                if (t.includes("CONNECT") || t.includes("59")) {
+                  planId = "CONNECT"; planName = "CONNECT"; planPrice = "59€ HT / mois";
+                } else if (t.includes("PRO") || t.includes("89")) {
+                  planId = "PRO_SUIVI"; planName = "PRO SUIVI"; planPrice = "89€ HT / mois";
+                } else if (t.includes("SÉRÉNITÉ") || t.includes("SERENITE") || t.includes("129")) {
+                  planId = "SERENITE"; planName = "SÉRÉNITÉ"; planPrice = "129€ HT / mois";
+                }
+                break;
+              }
+              p = p.parentElement;
+            }
           }
 
-          if (planAttr || href.includes("/contact") || href === "#contact" || text.includes("choisir") || text.includes("démo") || text.includes("commander") || text.includes("souscrire") || text.includes("s'abonner") || text.includes("payer") || text.includes("pack")) {
+          var href = el.getAttribute("href") || "";
+          var text = (el.textContent || "").toLowerCase();
+
+          // Exclude SUR MESURE / Sur devis
+          if (text.includes("sur devis") || text.includes("sur mesure") || (el.parentElement && el.parentElement.textContent.toLowerCase().includes("sur devis"))) {
+            return;
+          }
+
+          if (planId || href.includes("/contact") || href === "#contact" || text.includes("choisir") || text.includes("commander") || text.includes("payer") || text.includes("souscrire")) {
             e.preventDefault();
             e.stopPropagation();
 
-            var planName = "SÉRÉNITÉ";
-            var planPrice = "129€ HT / mois";
-            var planId = "SERENITE";
-
-            if (planAttr === "CONNECT" || text.includes("connect") || cardText.includes("connect")) {
+            if (!planId) {
+              planId = "CONNECT";
               planName = "CONNECT";
               planPrice = "59€ HT / mois";
-              planId = "CONNECT";
-            } else if (planAttr === "PRO_SUIVI" || text.includes("pro") || cardText.includes("pro suivi")) {
-              planName = "PRO SUIVI";
-              planPrice = "89€ HT / mois";
-              planId = "PRO_SUIVI";
             }
 
             openStripeCheckoutModal(planName, planPrice, planId);
