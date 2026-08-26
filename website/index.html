@@ -172,8 +172,33 @@
     <link rel="stylesheet" crossorigin href="/assets/index-mPtGQZjc.css">
     <link rel="stylesheet" href="/assets/responsive-enhancements.css">
   </head>
-
   <body>
     <div id="root"></div>
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        document.addEventListener("click", function(e) {
+          var el = e.target.closest("a, button");
+          if (!el) return;
+          var href = el.getAttribute("href") || "";
+          var text = (el.textContent || "").toLowerCase();
+          
+          if (href.includes("/contact") || href === "#contact" || text.includes("choisir") || text.includes("démo") || text.includes("commander") || text.includes("souscrire") || text.includes("s'abonner") || text.includes("contact")) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            var plan = "SERENITE";
+            if (text.includes("connect") || href.includes("connect")) {
+              plan = "CONNECT";
+            } else if (text.includes("pro") || href.includes("pro")) {
+              plan = "PRO_SUIVI";
+            } else if (text.includes("sérénité") || text.includes("serenite")) {
+              plan = "SERENITE";
+            }
+            
+            window.location.href = "/login?plan=" + plan + "&checkout=true";
+          }
+        }, true);
+      });
+    </script>
   </body>
 </html>
