@@ -54,30 +54,33 @@ export class BillingController {
     let establishmentId = user?.establishmentId;
 
     if (!user) {
-      // Create establishment & user automatically
-      const estName = dto.establishmentName?.trim() || `Établissement ${email.split('@')[0]}`;
-      const establishment = await this.prisma.establishment.create({
-        data: {
-          name: estName,
-          type: 'RESTAURANT',
-        },
-      });
-      establishmentId = establishment.id;
-
-      // Hash default temporary password
       const bcrypt = require('bcrypt');
       const hashedPassword = await bcrypt.hash('ZidoHaccp2026!', 10);
 
       user = await this.prisma.user.create({
         data: {
           email,
-          password: hashedPassword,
-          firstName: dto.name?.trim().split(' ')[0] || 'Client',
-          lastName: dto.name?.trim().split(' ').slice(1).join(' ') || 'Zido',
+          passwordHash: hashedPassword,
+          displayName: dto.name?.trim() || `Client ${email.split('@')[0]}`,
           role: 'OWNER',
-          establishmentId: establishment.id,
+          emailVerified: true,
         },
       });
+
+      const estName = dto.establishmentName?.trim() || `Établissement ${email.split('@')[0]}`;
+      const establishment = await this.prisma.establishment.create({
+        data: {
+          name: estName,
+          ownerId: user.id,
+        },
+      });
+
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { establishmentId: establishment.id },
+      });
+
+      establishmentId = establishment.id;
     }
 
     if (!this.stripeService.isEnabled) {
