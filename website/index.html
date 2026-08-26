@@ -257,14 +257,49 @@
         });
       }
 
+      function updatePricingButtonsDOM() {
+        var buttons = document.querySelectorAll("button, a");
+        buttons.forEach(function(btn) {
+          var card = btn.closest(".rounded-2xl, [class*='rounded-'], div");
+          if (!card) return;
+          var text = (card.textContent || "").toUpperCase();
+          if (text.includes("CONNECT") && (text.includes("59") || text.includes("150"))) {
+            if (btn.textContent.includes("Nous contacter") || btn.textContent.includes("Choisir")) {
+              btn.innerHTML = 'Commander & Payer (59€) <svg class="ml-2 h-4 w-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>';
+              btn.setAttribute("data-plan", "CONNECT");
+            }
+          } else if (text.includes("PRO SUIVI") && (text.includes("89") || text.includes("350"))) {
+            if (btn.textContent.includes("Nous contacter") || btn.textContent.includes("Choisir")) {
+              btn.innerHTML = 'Commander & Payer (89€) <svg class="ml-2 h-4 w-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>';
+              btn.setAttribute("data-plan", "PRO_SUIVI");
+            }
+          } else if (text.includes("SÉRÉNITÉ") && (text.includes("129") || text.includes("650"))) {
+            if (btn.textContent.includes("Nous contacter") || btn.textContent.includes("Choisir")) {
+              btn.innerHTML = 'Commander & Payer (129€) <svg class="ml-2 h-4 w-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>';
+              btn.setAttribute("data-plan", "SERENITE");
+            }
+          }
+        });
+      }
+
       document.addEventListener("DOMContentLoaded", function() {
+        setInterval(updatePricingButtonsDOM, 500);
+
         document.addEventListener("click", function(e) {
           var el = e.target.closest("a, button");
           if (!el) return;
           var href = el.getAttribute("href") || "";
           var text = (el.textContent || "").toLowerCase();
+          var planAttr = el.getAttribute("data-plan");
+          var card = el.closest(".rounded-2xl, [class*='rounded-'], div");
+          var cardText = card ? (card.textContent || "").toLowerCase() : "";
 
-          if (href.includes("/contact") || href === "#contact" || text.includes("choisir") || text.includes("démo") || text.includes("commander") || text.includes("souscrire") || text.includes("s'abonner") || text.includes("pack")) {
+          // Exclude SUR MESURE / Sur devis from opening Stripe modal
+          if (cardText.includes("sur devis") || cardText.includes("sur mesure")) {
+            return; // Let standard contact link work for custom quote
+          }
+
+          if (planAttr || href.includes("/contact") || href === "#contact" || text.includes("choisir") || text.includes("démo") || text.includes("commander") || text.includes("souscrire") || text.includes("s'abonner") || text.includes("payer") || text.includes("pack")) {
             e.preventDefault();
             e.stopPropagation();
 
@@ -272,11 +307,11 @@
             var planPrice = "129€ HT / mois";
             var planId = "SERENITE";
 
-            if (text.includes("connect") || href.includes("connect")) {
+            if (planAttr === "CONNECT" || text.includes("connect") || cardText.includes("connect")) {
               planName = "CONNECT";
               planPrice = "59€ HT / mois";
               planId = "CONNECT";
-            } else if (text.includes("pro") || href.includes("pro")) {
+            } else if (planAttr === "PRO_SUIVI" || text.includes("pro") || cardText.includes("pro suivi")) {
               planName = "PRO SUIVI";
               planPrice = "89€ HT / mois";
               planId = "PRO_SUIVI";
