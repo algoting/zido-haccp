@@ -174,28 +174,115 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Direct Stripe Subscription Modal -->
+    <div id="stripe-checkout-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); backdrop-filter:blur(4px); z-index:9999; align-items:center; justify-content:center; padding:1rem;">
+      <div style="background:#ffffff; color:#111827; border-radius:1.25rem; padding:1.75rem; max-width:28rem; width:100%; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25); border:1px solid #E5E7EB; box-sizing:border-box;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+          <h3 style="font-size:1.25rem; font-weight:700; color:#111827; margin:0;">Souscrire au Pack <span id="modal-plan-name" style="color:#0D9488;">PRO SUIVI</span></h3>
+          <button onclick="closeStripeCheckoutModal()" style="background:none; border:none; font-size:1.75rem; color:#9CA3AF; cursor:pointer; font-weight:700;">&times;</button>
+        </div>
+        
+        <div style="background:#F0FDFA; border:1px solid #CCFBF1; border-radius:0.75rem; padding:1rem; margin-bottom:1.25rem;">
+          <p style="font-size:0.9rem; font-weight:700; color:#134E4A; margin:0;">Formule Sélectionnée : <span id="modal-plan-price" style="color:#0D9488;">89€ HT / mois</span></p>
+          <p style="font-size:0.75rem; color:#0F766E; margin-top:0.35rem; margin-bottom:0;">✓ Matériel & Sondes inclus • Activation immédiate • Sécurisé Stripe</p>
+        </div>
+
+        <form id="public-checkout-form" onsubmit="handlePublicCheckoutSubmit(event)">
+          <input type="hidden" id="modal-plan-id" value="PRO_SUIVI">
+          
+          <div style="margin-bottom:1rem;">
+            <label style="display:block; font-size:0.875rem; font-weight:600; color:#374151; margin-bottom:0.375rem;">Nom de votre Établissement *</label>
+            <input type="text" id="checkout-est-name" required placeholder="ex: Le Bistro Gourmand" style="width:100%; padding:0.75rem 1rem; border:1px solid #D1D5DB; border-radius:0.75rem; font-size:0.875rem; outline:none; box-sizing:border-box;">
+          </div>
+
+          <div style="margin-bottom:1.25rem;">
+            <label style="display:block; font-size:0.875rem; font-weight:600; color:#374151; margin-bottom:0.375rem;">Adresse Email Professionnelle *</label>
+            <input type="email" id="checkout-email-addr" required placeholder="contact@restaurant.fr" style="width:100%; padding:0.75rem 1rem; border:1px solid #D1D5DB; border-radius:0.75rem; font-size:0.875rem; outline:none; box-sizing:border-box;">
+          </div>
+
+          <button type="submit" id="checkout-submit-btn" style="width:100%; padding:0.875rem 1rem; background:linear-gradient(to right, #0D9488, #059669); color:#ffffff; font-weight:700; border:none; border-radius:0.75rem; font-size:1rem; cursor:pointer; box-shadow:0 10px 15px -3px rgba(13,148,136,0.3); display:flex; align-items:center; justify-content:center; gap:0.5rem;">
+            <span id="btn-text">Proceder au Paiement Sécurisé (Stripe)</span>
+          </button>
+          
+          <p style="font-size:0.75rem; text-align:center; color:#6B7280; margin-top:0.85rem; margin-bottom:0;">
+            🔒 Cryptage SSL 256 bits — Traité par Stripe Payments Europe
+          </p>
+        </form>
+      </div>
+    </div>
+
     <script>
+      function openStripeCheckoutModal(planName, planPrice, planId) {
+        document.getElementById("modal-plan-name").textContent = planName;
+        document.getElementById("modal-plan-price").textContent = planPrice;
+        document.getElementById("modal-plan-id").value = planId;
+        var modal = document.getElementById("stripe-checkout-modal");
+        modal.style.display = "flex";
+      }
+
+      function closeStripeCheckoutModal() {
+        var modal = document.getElementById("stripe-checkout-modal");
+        modal.style.display = "none";
+      }
+
+      function handlePublicCheckoutSubmit(e) {
+        e.preventDefault();
+        var estName = document.getElementById("checkout-est-name").value;
+        var email = document.getElementById("checkout-email-addr").value;
+        var plan = document.getElementById("modal-plan-id").value;
+        var btn = document.getElementById("checkout-submit-btn");
+        var btnText = document.getElementById("btn-text");
+
+        btn.disabled = true;
+        btnText.textContent = "Redirection vers Stripe Checkout en cours...";
+
+        fetch("/api/billing/public-checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email, establishmentName: estName, plan: plan })
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (data && data.url) {
+            window.location.href = data.url;
+          } else {
+            alert("Erreur lors de l'initialisation du paiement: " + (data.message || "Veuillez réessayer"));
+            btn.disabled = false;
+            btnText.textContent = "Proceder au Paiement Sécurisé (Stripe)";
+          }
+        })
+        .catch(function(err) {
+          console.error(err);
+          window.location.href = "/login?plan=" + plan + "&checkout=true";
+        });
+      }
+
       document.addEventListener("DOMContentLoaded", function() {
         document.addEventListener("click", function(e) {
           var el = e.target.closest("a, button");
           if (!el) return;
           var href = el.getAttribute("href") || "";
           var text = (el.textContent || "").toLowerCase();
-          
-          if (href.includes("/contact") || href === "#contact" || text.includes("choisir") || text.includes("démo") || text.includes("commander") || text.includes("souscrire") || text.includes("s'abonner") || text.includes("contact")) {
+
+          if (href.includes("/contact") || href === "#contact" || text.includes("choisir") || text.includes("démo") || text.includes("commander") || text.includes("souscrire") || text.includes("s'abonner") || text.includes("pack")) {
             e.preventDefault();
             e.stopPropagation();
-            
-            var plan = "SERENITE";
+
+            var planName = "SÉRÉNITÉ";
+            var planPrice = "129€ HT / mois";
+            var planId = "SERENITE";
+
             if (text.includes("connect") || href.includes("connect")) {
-              plan = "CONNECT";
+              planName = "CONNECT";
+              planPrice = "59€ HT / mois";
+              planId = "CONNECT";
             } else if (text.includes("pro") || href.includes("pro")) {
-              plan = "PRO_SUIVI";
-            } else if (text.includes("sérénité") || text.includes("serenite")) {
-              plan = "SERENITE";
+              planName = "PRO SUIVI";
+              planPrice = "89€ HT / mois";
+              planId = "PRO_SUIVI";
             }
-            
-            window.location.href = "/login?plan=" + plan + "&checkout=true";
+
+            openStripeCheckoutModal(planName, planPrice, planId);
           }
         }, true);
       });

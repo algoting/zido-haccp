@@ -30,6 +30,73 @@ export class BillingController {
   ) {}
 
   /**
+   * Public Checkout Endpoint for Direct Subscription from Showcase / Tarifs Page
+   * POST /billing/public-checkout
+   */
+  @Post('/public-checkout')
+  async publicCheckout(@Body() dto: { email: string; name?: string; establishmentName?: string; plan?: SubscriptionPlan }) {
+    if (!dto || !dto.email) {
+      throw new BadRequestException('Email obligatoire pour procéder au paiement');
+    }
+
+    const validPlans: string[] = Object.values(SubscriptionPlan);
+    const plan = validPlans.includes(dto.plan || '')
+      ? (dto.plan as SubscriptionPlan)
+      : SubscriptionPlan.CONNECT;
+
+    const email = dto.email.toLowerCase().trim();
+
+    // Find or create user and establishment for this checkout
+    let user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    let establishmentId = user?.establishmentId;
+
+    if (!user) {
+      // Create establishment & user automatically
+      const estName = dto.establishmentName?.trim() || `Établissement ${email.split('@')[0]}`;
+      const establishment = await this.prisma.establishment.create({
+        data: {
+          name: estName,
+          type: 'RESTAURANT',
+        },
+      });
+      establishmentId = establishment.id;
+
+      // Hash default temporary password
+      const bcrypt = require('bcrypt');
+      const hashedPassword = await bcrypt.hash('ZidoHaccp2026!', 10);
+
+      user = await this.prisma.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          firstName: dto.name?.trim().split(' ')[0] || 'Client',
+          lastName: dto.name?.trim().split(' ').slice(1).join(' ') || 'Zido',
+          role: 'OWNER',
+          establishmentId: establishment.id,
+        },
+      });
+    }
+
+    if (!this.stripeService.isEnabled) {
+      return {
+        url: `https://zidohaccp.com/login?email=${encodeURIComponent(email)}&activated=true`,
+        message: 'Abonnement activé avec succès',
+      };
+    }
+
+    return this.stripeService.createCheckoutSession(
+      establishmentId!,
+      email,
+      `https://zidohaccp.com/login?status=success&email=${encodeURIComponent(email)}`,
+      `https://zidohaccp.com/tarifs?status=canceled`,
+      plan,
+    );
+  }
+
+  /**
    * Create a Stripe Checkout Session for the current user's establishment
    * POST /billing/create-checkout-session
    */
