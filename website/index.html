@@ -268,21 +268,21 @@
             var ct = (card.textContent || "").toUpperCase();
 
             if (ct.includes("ENGAGEMENT 36 MOIS") || ct.includes("TABLETTE 8 POUCES") || ct.includes("LE PLUS POPULAIRE")) {
-              if (ct.includes("CONNECT") && ct.includes("59")) {
+              if (ct.includes("CONNECT") && (ct.includes("59") || ct.includes("150"))) {
                 btn.setAttribute("data-stripe-plan", "CONNECT");
                 btn.setAttribute("data-stripe-name", "CONNECT");
-                btn.setAttribute("data-stripe-price", "59€ HT / mois");
-                btn.innerHTML = 'Commander & Payer (59€) <svg class="ml-2 h-4 w-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>';
-              } else if (ct.includes("PRO SUIVI") && ct.includes("89")) {
+                btn.setAttribute("data-stripe-price", ct.includes("150") ? "150 MAD / mois" : "59€ HT / mois");
+                btn.innerHTML = (ct.includes("150") ? 'Commander (150 MAD)' : 'Commander & Payer (59€)') + ' <svg class="ml-2 h-4 w-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>';
+              } else if (ct.includes("PRO SUIVI") && (ct.includes("89") || ct.includes("350"))) {
                 btn.setAttribute("data-stripe-plan", "PRO_SUIVI");
                 btn.setAttribute("data-stripe-name", "PRO SUIVI");
-                btn.setAttribute("data-stripe-price", "89€ HT / mois");
-                btn.innerHTML = 'Commander & Payer (89€) <svg class="ml-2 h-4 w-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>';
-              } else if ((ct.includes("SÉRÉNITÉ") || ct.includes("SERENITE")) && ct.includes("129")) {
+                btn.setAttribute("data-stripe-price", ct.includes("350") ? "350 MAD / mois" : "89€ HT / mois");
+                btn.innerHTML = (ct.includes("350") ? 'Commander (350 MAD)' : 'Commander & Payer (89€)') + ' <svg class="ml-2 h-4 w-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>';
+              } else if ((ct.includes("SÉRÉNITÉ") || ct.includes("SERENITE")) && (ct.includes("129") || ct.includes("650"))) {
                 btn.setAttribute("data-stripe-plan", "SERENITE");
                 btn.setAttribute("data-stripe-name", "SÉRÉNITÉ");
-                btn.setAttribute("data-stripe-price", "129€ HT / mois");
-                btn.innerHTML = 'Commander & Payer (129€) <svg class="ml-2 h-4 w-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>';
+                btn.setAttribute("data-stripe-price", ct.includes("650") ? "650 MAD / mois" : "129€ HT / mois");
+                btn.innerHTML = (ct.includes("650") ? 'Commander (650 MAD)' : 'Commander & Payer (129€)') + ' <svg class="ml-2 h-4 w-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>';
               }
             }
           }
