@@ -106,6 +106,7 @@ export class StripeService {
       customer: customerId,
       mode: 'subscription',
       line_items: lineItems as any,
+      payment_method_types: ['card', 'paypal'],
       success_url: successUrl,
       cancel_url: cancelUrl,
       subscription_data: {
